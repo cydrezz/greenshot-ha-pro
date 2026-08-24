@@ -256,6 +256,8 @@ namespace Greenshot.Editor.Forms
 
                 BindFieldControls();
                 RefreshEditorControls();
+                // ha-pro: always show the new capture completely (shrink to fit, never enlarge)
+                ZoomShrinkToFit();
                 // Fix title
                 if (_surface?.CaptureDetails?.Title != null)
                 {
@@ -1927,6 +1929,19 @@ namespace Greenshot.Editor.Forms
             var nextValue = Fraction.Parse((string) senderMenuItem.Tag);
 
             ZoomSetValue(nextValue);
+        }
+
+        /// <summary>
+        /// ha-pro: zoom out until the whole image is visible, but never enlarge beyond 100%.
+        /// </summary>
+        private void ZoomShrinkToFit()
+        {
+            ZoomBestFitMenuItemClick(this, EventArgs.Empty);
+            Fraction noZoom = (1, 1);
+            if (Surface.ZoomFactor > noZoom)
+            {
+                ZoomSetValue(noZoom);
+            }
         }
 
         private void ZoomBestFitMenuItemClick(object sender, EventArgs e)
