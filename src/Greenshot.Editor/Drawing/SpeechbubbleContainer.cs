@@ -76,7 +76,7 @@ namespace Greenshot.Editor.Drawing
         /// </summary>
         protected override void InitializeFields()
         {
-            AddField(GetType(), FieldType.LINE_THICKNESS, 2);
+            AddField(GetType(), FieldType.LINE_THICKNESS, 4); // ha-pro: default 4 instead of 2
             AddField(GetType(), FieldType.LINE_COLOR, Color.Blue);
             AddField(GetType(), FieldType.SHADOW, false);
             AddField(GetType(), FieldType.FONT_ITALIC, false);
