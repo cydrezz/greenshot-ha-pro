@@ -447,9 +447,11 @@ namespace Greenshot.Forms
             }
             else if (_captureMode == CaptureMode.Region)
             {
-                // ha-pro: a plain click without dragging captures the full (virtual) screen.
-                // _captureRect is relative to _capture.ScreenBounds, so (0,0,w,h) covers all monitors.
-                _captureRect = new NativeRect(0, 0, _capture.ScreenBounds.Width, _capture.ScreenBounds.Height);
+                // ha-pro: a plain click without dragging captures the monitor under the cursor.
+                // Screen bounds are in screen coordinates, _captureRect is relative to _capture.ScreenBounds.
+                var clickedScreen = Screen.FromPoint(Cursor.Position).Bounds;
+                _captureRect = new NativeRect(clickedScreen.X, clickedScreen.Y, clickedScreen.Width, clickedScreen.Height)
+                    .Offset(-_capture.ScreenBounds.Location.X, -_capture.ScreenBounds.Location.Y);
                 DialogResult = DialogResult.OK;
             }
             else
