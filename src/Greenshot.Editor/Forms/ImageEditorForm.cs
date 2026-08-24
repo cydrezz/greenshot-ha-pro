@@ -128,6 +128,28 @@ namespace Greenshot.Editor.Forms
             UpdateUi();
         }
 
+        /// <summary>
+        /// ha-pro: with large icons (BaseIconSize >= 32) the menu, toolbar and status text
+        /// would stay at the 9pt system font and look tiny next to the icons.
+        /// Grow the text by a third of the icon growth (32px icons -> 12pt instead of 9pt).
+        /// Drop-down menus inherit the font from their owner item, so the strips are enough.
+        /// </summary>
+        private void ApplyHaProFontScaling()
+        {
+            if (!coreConfiguration.UseLargeIcons)
+            {
+                return;
+            }
+
+            float iconScale = coreConfiguration.IconSize.Height / 16f;
+            Font baseFont = SystemFonts.MenuFont ?? Font;
+            var scaledFont = new Font(baseFont.FontFamily, baseFont.Size * (1f + (iconScale - 1f) / 3f), baseFont.Style);
+            foreach (ToolStrip strip in new ToolStrip[] { menuStrip1, toolsToolStrip, destinationsToolStrip, propertiesToolStrip, statusStrip1 })
+            {
+                strip.Font = scaledFont;
+            }
+        }
+
         public ImageEditorForm()
         {
             var image = ImageHelper.CreateEmpty(EditorConfiguration.DefaultEditorSize.Width, EditorConfiguration.DefaultEditorSize.Height, PixelFormat.Format32bppArgb, Color.White, 96f, 96f);
@@ -149,6 +171,7 @@ namespace Greenshot.Editor.Forms
             //
             ManualLanguageApply = true;
             InitializeComponent();
+            ApplyHaProFontScaling();
             // Make sure we change the icon size depending on the scaling
             Load += delegate
             {
