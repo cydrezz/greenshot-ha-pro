@@ -124,8 +124,120 @@ namespace Greenshot.Editor.Forms
             destinationsToolStrip.ImageScalingSize = newSize;
             propertiesToolStrip.ImageScalingSize = newSize;
             propertiesToolStrip.MinimumSize = new Size(150, newSize.Height + 10);
+            ApplyHaProFluentIcons(newSize);
             _surface?.AdjustToDpi(newDpi);
             UpdateUi();
+        }
+
+        /// <summary>
+        /// ha-pro: replace the 16px Fugue bitmaps of the editor with glyphs of the
+        /// "Segoe Fluent Icons" font, rendered at the real icon size (sharp at 32px and any DPI).
+        /// Only active with large icons and an installed font; otherwise the bitmaps stay.
+        /// The color buttons (fill/line color) and the counter icon are handled elsewhere.
+        /// </summary>
+        private void ApplyHaProFluentIcons(Size size)
+        {
+            if (!FluentIcons.IsEnabled || size.Width <= 0 || size.Height <= 0)
+            {
+                return;
+            }
+
+            Color color = FluentIcons.DefaultColor;
+
+            void Set(ToolStripItem item, char glyph, bool flipX = false, float rotate = 0f)
+            {
+                if (item != null)
+                {
+                    item.Image = FluentIcons.Render(glyph, size, color, flipX, rotate);
+                }
+            }
+
+            // tools
+            Set(btnCursor, FluentIcons.Cursor);
+            Set(btnRect, FluentIcons.Rectangle);
+            Set(addRectangleToolStripMenuItem, FluentIcons.Rectangle);
+            Set(btnEllipse, FluentIcons.Ellipse);
+            Set(addEllipseToolStripMenuItem, FluentIcons.Ellipse);
+            Set(btnLine, FluentIcons.Line, rotate: -45f);
+            Set(drawLineToolStripMenuItem, FluentIcons.Line, rotate: -45f);
+            Set(btnArrow, FluentIcons.Arrow);
+            Set(drawArrowToolStripMenuItem, FluentIcons.Arrow);
+            Set(arrowHeadsDropDownButton, FluentIcons.Arrow);
+            Set(btnFreehand, FluentIcons.Pen);
+            Set(drawFreehandToolStripMenuItem, FluentIcons.Pen);
+            Set(btnText, FluentIcons.Text);
+            Set(addTextBoxToolStripMenuItem, FluentIcons.Text);
+            Set(btnSpeechBubble, FluentIcons.SpeechBubble);
+            Set(addSpeechBubbleToolStripMenuItem, FluentIcons.SpeechBubble);
+            Set(btnHighlight, FluentIcons.Highlight);
+            Set(highlightModeButton, FluentIcons.Highlight);
+            Set(textHighlightMenuItem, FluentIcons.Highlight);
+            Set(areaHighlightMenuItem, FluentIcons.Rectangle);
+            Set(grayscaleHighlightMenuItem, FluentIcons.HalfFilledTop);
+            Set(magnifyMenuItem, FluentIcons.Zoom);
+            Set(btnObfuscate, FluentIcons.Obfuscate);
+            Set(obfuscateModeButton, FluentIcons.Obfuscate);
+            Set(pixelizeToolStripMenuItem, FluentIcons.Pixelize);
+            Set(blurToolStripMenuItem, FluentIcons.Obfuscate);
+            Set(toolStripSplitButton1, FluentIcons.Effects);
+            Set(btnResize, FluentIcons.Resize);
+            Set(btnCrop, FluentIcons.Crop);
+            Set(cropModeButton, FluentIcons.Crop);
+            Set(defaultCropModeToolStripMenuItem, FluentIcons.Crop);
+            Set(verticalCropModeToolStripMenuItem, FluentIcons.CropVertical);
+            Set(horizontalCropModeToolStripMenuItem, FluentIcons.CropHorizontal);
+            Set(autoCropModeToolStripMenuItem, FluentIcons.ZoomFit);
+            Set(rotateCwToolstripButton, FluentIcons.Rotate);
+            Set(rotateCcwToolstripButton, FluentIcons.Rotate, flipX: true);
+
+            // edit / file
+            Set(btnSave, FluentIcons.Save);
+            Set(btnClipboard, FluentIcons.Clipboard);
+            Set(btnPrint, FluentIcons.Print);
+            Set(btnDelete, FluentIcons.Delete);
+            Set(removeObjectToolStripMenuItem, FluentIcons.Delete);
+            Set(btnCut, FluentIcons.Cut);
+            Set(cutToolStripMenuItem, FluentIcons.Cut);
+            Set(btnCopy, FluentIcons.Copy);
+            Set(copyToolStripMenuItem, FluentIcons.Copy);
+            Set(btnPaste, FluentIcons.Paste);
+            Set(pasteToolStripMenuItem, FluentIcons.Paste);
+            Set(btnUndo, FluentIcons.Undo);
+            Set(undoToolStripMenuItem, FluentIcons.Undo);
+            Set(btnRedo, FluentIcons.Redo);
+            Set(redoToolStripMenuItem, FluentIcons.Redo);
+            Set(btnSettings, FluentIcons.Settings);
+            Set(preferencesToolStripMenuItem, FluentIcons.Settings);
+            Set(btnHelp, FluentIcons.Help);
+            Set(helpToolStripMenuItem1, FluentIcons.Help);
+            Set(closeToolStripMenuItem, FluentIcons.Close);
+
+            // properties
+            Set(fontBoldButton, FluentIcons.Bold);
+            Set(fontItalicButton, FluentIcons.Italic);
+            Set(textHorizontalAlignmentButton, FluentIcons.AlignLeft);
+            Set(alignLeftToolStripMenuItem, FluentIcons.AlignLeft);
+            Set(alignCenterToolStripMenuItem, FluentIcons.AlignCenter);
+            Set(alignRightToolStripMenuItem, FluentIcons.AlignRight);
+            // vertical alignment = the horizontal glyphs turned by 90 degrees (left -> top)
+            Set(textVerticalAlignmentButton, FluentIcons.AlignLeft, rotate: 90f);
+            Set(alignTopToolStripMenuItem, FluentIcons.AlignLeft, rotate: 90f);
+            Set(alignMiddleToolStripMenuItem, FluentIcons.AlignCenter, rotate: 90f);
+            Set(alignBottomToolStripMenuItem, FluentIcons.AlignRight, rotate: 90f);
+            if (shadowButton != null)
+            {
+                shadowButton.Image = FluentIcons.RenderShadow(size, color);
+            }
+
+            Set(btnConfirm, FluentIcons.Ok);
+            Set(btnCancel, FluentIcons.Cancel);
+
+            // zoom
+            Set(zoomInMenuItem, FluentIcons.ZoomIn);
+            Set(zoomOutMenuItem, FluentIcons.ZoomOut);
+            Set(zoomBestFitMenuItem, FluentIcons.ZoomFit);
+            Set(zoomActualSizeMenuItem, FluentIcons.ZoomActual);
+            Set(zoomStatusDropDownBtn, FluentIcons.Zoom);
         }
 
         /// <summary>
@@ -172,6 +284,7 @@ namespace Greenshot.Editor.Forms
             ManualLanguageApply = true;
             InitializeComponent();
             ApplyHaProFontScaling();
+            ApplyHaProFluentIcons(coreConfiguration.IconSize);
             // Make sure we change the icon size depending on the scaling
             Load += delegate
             {
@@ -1374,7 +1487,12 @@ namespace Greenshot.Editor.Forms
         {
             int stepLabels = _surface.CountStepLabels(null);
             Image icon;
-            if (stepLabels <= 20)
+            if (FluentIcons.IsEnabled)
+            {
+                // ha-pro: sharp counter at the real icon size
+                icon = FluentIcons.RenderCounter(stepLabels, toolsToolStrip.ImageScalingSize, FluentIcons.DefaultColor);
+            }
+            else if (stepLabels <= 20)
             {
                 icon = (Image) resources.GetObject($"btnStepLabel{stepLabels:00}.Image");
             }

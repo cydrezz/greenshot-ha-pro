@@ -33,7 +33,8 @@ namespace Greenshot.Base.Core
 
         public static Image GetImage(string imageName)
         {
-            return (Image) GreenshotResourceManager.GetObject(imageName);
+            // ha-pro: sharp monochrome icons for destinations when running with large icons
+            return FluentIcons.ForResource(imageName) ?? (Image) GreenshotResourceManager.GetObject(imageName);
         }
 
         public static Icon GetIcon(string imageName)
