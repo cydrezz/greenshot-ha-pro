@@ -22,6 +22,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using Greenshot.Base;
 using Greenshot.Base.Core;
 using Greenshot.Base.IniFile;
 using Greenshot.Base.Interfaces;
@@ -94,13 +95,28 @@ namespace Greenshot.Editor.Destinations
             {
                 if (editorConfiguration.ReuseEditor)
                 {
-                    foreach (IImageEditor openedEditor in ImageEditorForm.Editors)
+                    // ha-pro: a new capture never opens a second editor window.
+                    // Editors with unsaved changes are saved silently (FileNoDialog overwrites the
+                    // file the capture was already written to), the first editor gets the new
+                    // capture, every other editor is closed. Only an editor whose auto-save failed
+                    // is left untouched, so no work is ever lost.
+                    // Snapshot: closing an editor removes it from ImageEditorForm.Editors.
+                    foreach (IImageEditor openedEditor in new List<IImageEditor>(ImageEditorForm.Editors))
                     {
-                        if (openedEditor.Surface.Modified) continue;
+                        if (openedEditor.Surface.Modified && !HaProAutoSave(openedEditor))
+                        {
+                            continue;
+                        }
 
-                        openedEditor.Surface = surface;
-                        exportInformation.ExportMade = true;
-                        break;
+                        if (!exportInformation.ExportMade)
+                        {
+                            openedEditor.Surface = surface;
+                            exportInformation.ExportMade = true;
+                        }
+                        else if (openedEditor is System.Windows.Forms.Form editorWindow)
+                        {
+                            editorWindow.Close();
+                        }
                     }
                 }
 
@@ -149,6 +165,32 @@ namespace Greenshot.Editor.Destinations
             // Workaround for the modified flag when using the editor.
             surface.Modified = modified;
             return exportInformation;
+        }
+
+        /// <summary>
+        /// ha-pro: save the (modified) content of an open editor without any dialog.
+        /// </summary>
+        /// <returns>true when the save succeeded and the editor is no longer modified</returns>
+        private static bool HaProAutoSave(IImageEditor openedEditor)
+        {
+            try
+            {
+                var saved = DestinationHelper.ExportCapture(false, WellKnownDestinations.FileNoDialog, openedEditor.Surface, openedEditor.CaptureDetails);
+                if (saved != null && saved.ExportMade)
+                {
+                    openedEditor.Surface.Modified = false;
+                    LOG.InfoFormat("ha-pro: auto-saved editor content to {0}", saved.Filepath);
+                    return true;
+                }
+
+                LOG.WarnFormat("ha-pro: auto-save of editor content failed: {0}", saved?.ErrorMessage);
+            }
+            catch (Exception e)
+            {
+                LOG.Error("ha-pro: auto-save of editor content failed", e);
+            }
+
+            return false;
         }
     }
 }
