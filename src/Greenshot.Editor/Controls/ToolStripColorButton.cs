@@ -64,7 +64,9 @@ namespace Greenshot.Editor.Controls
                 if (Image != null)
                 {
                     using Graphics graphics = Graphics.FromImage(Image);
-                    graphics.FillRectangle(brush, new NativeRect(0, 13, 16, 3));
+                    // ha-pro: color bar scales with the icon (16px: rows 13..15, 32px: rows 26..31)
+                    int barHeight = Math.Max(3, Image.Height * 3 / 16);
+                    graphics.FillRectangle(brush, new NativeRect(0, Image.Height - barHeight, Image.Width, barHeight));
                 }
 
                 // cleanup GDI Object

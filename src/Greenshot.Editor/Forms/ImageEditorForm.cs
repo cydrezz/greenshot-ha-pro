@@ -212,7 +212,20 @@ namespace Greenshot.Editor.Forms
             Set(helpToolStripMenuItem1, FluentIcons.Help);
             Set(closeToolStripMenuItem, FluentIcons.Close);
 
-            // properties
+            // properties: the color buttons paint their color bar into the bottom 3/16 of the image
+            int barHeight = Math.Max(3, size.Height * 3 / 16);
+            foreach (var colorButton in new[] { (btnFillColor, FluentIcons.Fill), (btnLineColor, FluentIcons.Pen) })
+            {
+                if (colorButton.Item1 == null)
+                {
+                    continue;
+                }
+
+                colorButton.Item1.Image = FluentIcons.RenderAboveBar(colorButton.Item2, size, color, barHeight + 1);
+                // repaint the bar with the current color onto the new image
+                colorButton.Item1.SelectedColor = colorButton.Item1.SelectedColor;
+            }
+
             Set(fontBoldButton, FluentIcons.Bold);
             Set(fontItalicButton, FluentIcons.Italic);
             Set(textHorizontalAlignmentButton, FluentIcons.AlignLeft);

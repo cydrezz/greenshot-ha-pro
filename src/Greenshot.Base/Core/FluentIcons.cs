@@ -86,6 +86,8 @@ namespace Greenshot.Base.Core
         public const char Close = '';
         public const char Mail = '';
 
+        public const char Fill = '';
+
         private static readonly Lazy<bool> Available = new Lazy<bool>(() =>
         {
             try
@@ -181,6 +183,24 @@ namespace Greenshot.Base.Core
                 graphics.Clear(Color.Transparent);
                 ApplyTransform(graphics, size, flipX, rotateDegrees);
                 DrawGlyph(graphics, glyph, new RectangleF(0, 0, size.Width, size.Height), size.Height * 0.70f, color);
+            }
+
+            return bitmap;
+        }
+
+        /// <summary>
+        /// Render one glyph into the upper part of the bitmap, leaving the bottom rows free
+        /// (used for the color buttons, which paint their color bar there).
+        /// </summary>
+        /// <param name="bottomFree">rows at the bottom to keep empty</param>
+        public static Bitmap RenderAboveBar(char glyph, Size size, Color color, int bottomFree)
+        {
+            var bitmap = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(Color.Transparent);
+                float cellHeight = Math.Max(1, size.Height - bottomFree);
+                DrawGlyph(graphics, glyph, new RectangleF(0, 0, size.Width, cellHeight), cellHeight * 0.80f, color);
             }
 
             return bitmap;
