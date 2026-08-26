@@ -414,6 +414,27 @@ namespace Greenshot.Editor.Forms
                 }
             }
 
+            HaProBringToFront();
+        }
+
+        /// <summary>
+        /// ha-pro: a reused editor must come to the front even when Windows denies
+        /// SetForegroundWindow. By the time the new capture arrives the capture form is
+        /// already hidden, so the previously active application owns the foreground again
+        /// and Windows may only flash the taskbar button instead of raising the editor.
+        /// A TopMost flip is not subject to the foreground lock and reliably lifts the
+        /// window in the z-order; Activate/ToForeground then take the keyboard focus
+        /// whenever Windows allows it.
+        /// </summary>
+        private void HaProBringToFront()
+        {
+            if (WindowState == FormWindowState.Minimized)
+            {
+                WindowState = FormWindowState.Normal;
+            }
+
+            TopMost = true;
+            TopMost = false;
             Activate();
             WindowDetails.ToForeground(Handle);
         }
