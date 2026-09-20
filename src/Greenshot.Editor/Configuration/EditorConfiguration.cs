@@ -47,6 +47,9 @@ namespace Greenshot.Editor.Configuration
         [IniProperty("MatchSizeToCapture", Description = "Match the editor window size to the capture", DefaultValue = "True")]
         public bool MatchSizeToCapture { get; set; }
 
+        [IniProperty("HaProCompactToolbar", Description = "ha-pro: show the tool properties in the row of the destination buttons instead of an own row", DefaultValue = "True")]
+        public bool HaProCompactToolbar { get; set; }
+
         [IniProperty("WindowPlacementFlags", Description = "Placement flags", DefaultValue = "0")]
         public WindowPlacementFlags WindowPlacementFlags { get; set; }
 

@@ -394,6 +394,7 @@ namespace Greenshot.Editor.Forms
             ApplyHaProFontScaling();
             ApplyHaProFluentIcons(coreConfiguration.IconSize);
             ApplyHaProDarkMode();
+            HaProCompactToolbar();
             // Make sure we change the icon size depending on the scaling
             Load += delegate
             {
@@ -589,7 +590,7 @@ namespace Greenshot.Editor.Forms
         {
             using Pen cbBorderPen = new Pen(HaProTheme.IsDark ? HaProTheme.Border : SystemColors.ActiveBorder);
             // Loop over all items in the propertiesToolStrip
-            foreach (ToolStripItem item in propertiesToolStrip.Items)
+            foreach (ToolStripItem item in HaProPropertyItems)
             {
                 // Only ToolStripComboBox that are visible
                 if (item is not ToolStripComboBox { Visible: true } cb)
@@ -1645,7 +1646,7 @@ namespace Greenshot.Editor.Forms
 
         private void HideToolstripItems()
         {
-            foreach (ToolStripItem toolStripItem in propertiesToolStrip.Items)
+            foreach (ToolStripItem toolStripItem in HaProPropertyItems)
             {
                 toolStripItem.Visible = false;
             }
@@ -2248,6 +2249,36 @@ namespace Greenshot.Editor.Forms
         /// the user gave it, also when the zoom changes. Upstream resized on every zoom change regardless.
         /// </summary>
         private static bool HaProKeepWindowSize => !EditorConfiguration.MatchSizeToCapture;
+
+        private ToolStripItem[] _haProPropertyItems;
+
+        /// <summary>
+        /// ha-pro: the tool properties, wherever they live (own strip or the destination row)
+        /// </summary>
+        private IEnumerable<ToolStripItem> HaProPropertyItems => _haProPropertyItems ?? propertiesToolStrip.Items.Cast<ToolStripItem>();
+
+        /// <summary>
+        /// ha-pro: the tool properties (colors, line thickness, font...) move behind the destination buttons,
+        /// which frees one strip row for the image. The items are moved, not the strip: two strips in one row of a
+        /// ToolStripPanel get re-wrapped by WinForms whenever a width changes.
+        /// Switched off by the ini value HaProCompactToolbar=False (section Editor).
+        /// </summary>
+        private void HaProCompactToolbar()
+        {
+            if (!EditorConfiguration.HaProCompactToolbar)
+            {
+                return;
+            }
+
+            _haProPropertyItems = propertiesToolStrip.Items.Cast<ToolStripItem>().ToArray();
+            destinationsToolStrip.SuspendLayout();
+            destinationsToolStrip.Items.Add(new ToolStripSeparator());
+            // adding an item to another strip takes it out of the old one
+            destinationsToolStrip.Items.AddRange(_haProPropertyItems);
+            destinationsToolStrip.ResumeLayout(true);
+            destinationsToolStrip.Paint += PropertiesToolStrip_Paint;
+            propertiesToolStrip.Visible = false;
+        }
 
         // ha-pro: true while the editor is maximized by HaProUseFullAreaIfNeeded and not by the user
         private bool _haProAutoMaximized;
