@@ -501,6 +501,8 @@ namespace Greenshot.Editor.Forms
 
                 BindFieldControls();
                 RefreshEditorControls();
+                // ha-pro: a capture that is too big for the kept window gets the whole screen for as long as it is shown
+                HaProUseFullAreaIfNeeded();
                 // ha-pro: always show the new capture completely (shrink to fit, never enlarge)
                 ZoomShrinkToFit();
                 // Fix title
@@ -1232,7 +1234,14 @@ namespace Greenshot.Editor.Forms
             }
 
             // persist our geometry string.
-            EditorConfiguration.SetEditorPlacement(new WindowDetails(Handle).WindowPlacement);
+            var placementToKeep = new WindowDetails(Handle).WindowPlacement;
+            if (_haProAutoMaximized && placementToKeep.ShowCmd == Dapplo.Windows.User32.Enums.ShowWindowCommands.ShowMaximized)
+            {
+                // ha-pro: maximized only for a big capture, the next editor opens in the kept size again
+                placementToKeep.ShowCmd = Dapplo.Windows.User32.Enums.ShowWindowCommands.Normal;
+            }
+
+            EditorConfiguration.SetEditorPlacement(placementToKeep);
             IniConfig.Save();
 
             // remove from the editor list
@@ -2208,6 +2217,59 @@ namespace Greenshot.Editor.Forms
         /// the user gave it, also when the zoom changes. Upstream resized on every zoom change regardless.
         /// </summary>
         private static bool HaProKeepWindowSize => !EditorConfiguration.MatchSizeToCapture;
+
+        // ha-pro: true while the editor is maximized by HaProUseFullAreaIfNeeded and not by the user
+        private bool _haProAutoMaximized;
+
+        /// <summary>
+        /// ha-pro: with a kept window size, a capture that does not fit into the kept window at 100%
+        /// (a whole monitor) maximizes the editor; the next capture that fits brings the kept size back.
+        /// Windows keeps the normal position while maximized, so nothing has to be remembered here.
+        /// </summary>
+        private void HaProUseFullAreaIfNeeded()
+        {
+            if (!HaProKeepWindowSize || Surface?.Image == null)
+            {
+                return;
+            }
+
+            bool isMaximized = WindowState == FormWindowState.Maximized;
+            if (isMaximized && !_haProAutoMaximized)
+            {
+                // maximized by the user, leave it alone
+                return;
+            }
+
+            var keptSize = isMaximized ? (Size) new WindowDetails(Handle).WindowPlacement.NormalPosition.Size : Size;
+            var keptImageSize = keptSize - GetChromeSize();
+            var imageSize = Surface.Image.Size;
+            bool fits = imageSize.Width <= keptImageSize.Width && imageSize.Height <= keptImageSize.Height;
+
+            if (!fits && !isMaximized)
+            {
+                _haProAutoMaximized = true;
+                WindowState = FormWindowState.Maximized;
+                if (!Visible)
+                {
+                    // a hidden form only notes the state, the size follows when it is shown: fit again then
+                    Shown += HaProFitAfterShown;
+                }
+            }
+            else if (fits && _haProAutoMaximized)
+            {
+                _haProAutoMaximized = false;
+                if (isMaximized)
+                {
+                    WindowState = FormWindowState.Normal;
+                }
+            }
+        }
+
+        private void HaProFitAfterShown(object sender, EventArgs e)
+        {
+            Shown -= HaProFitAfterShown;
+            ZoomShrinkToFit();
+        }
 
         /// <summary>
         /// ha-pro: zoom out until the whole image is visible, but never enlarge beyond 100%.
