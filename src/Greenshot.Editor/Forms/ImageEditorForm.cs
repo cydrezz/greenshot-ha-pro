@@ -2271,10 +2271,9 @@ namespace Greenshot.Editor.Forms
         }
 
         /// <summary>
-        /// ha-pro: with a kept window size, a capture that would be shown bigger on a whole screen than in
-        /// the kept window (a whole monitor) maximizes the editor on the screen that shows it biggest -
-        /// the kept window may sit on a portrait screen where maximizing gains nothing. The next capture
-        /// that gains nothing brings the kept position and size back.
+        /// ha-pro: with a kept window size, a capture that would be shown bigger maximized than in the kept
+        /// window (a whole monitor) maximizes the editor on its own screen; the next capture that gains
+        /// nothing brings the kept position and size back. The editor never moves to another screen.
         /// </summary>
         private void HaProUseFullAreaIfNeeded()
         {
@@ -2299,24 +2298,13 @@ namespace Greenshot.Editor.Forms
             var keptBounds = _haProAutoMaximized ? _haProKeptBounds : Bounds;
             var bestZoom = HaProBestZoom(imageSize, keptBounds.Size - chromeSize);
 
-            // the screen of the kept window first, then the nearest ones: only a real gain moves the window
+            // only the screen the kept window sits on: the editor never jumps to another screen.
+            // On a portrait screen a landscape monitor capture gains nothing, then the kept window stays as it is.
             Screen bestScreen = null;
-            var keptCenter = new Point(keptBounds.Left + keptBounds.Width / 2, keptBounds.Top + keptBounds.Height / 2);
-            var screens = Screen.AllScreens.OrderBy(screen =>
+            var keptScreen = Screen.FromRectangle(keptBounds);
+            if (HaProBestZoom(imageSize, keptScreen.WorkingArea.Size - chromeSize) > bestZoom)
             {
-                var area = screen.WorkingArea;
-                long dx = area.Left + area.Width / 2 - keptCenter.X;
-                long dy = area.Top + area.Height / 2 - keptCenter.Y;
-                return dx * dx + dy * dy;
-            });
-            foreach (var screen in screens)
-            {
-                var zoom = HaProBestZoom(imageSize, screen.WorkingArea.Size - chromeSize);
-                if (zoom > bestZoom)
-                {
-                    bestZoom = zoom;
-                    bestScreen = screen;
-                }
+                bestScreen = keptScreen;
             }
 
             if (bestScreen == null)
