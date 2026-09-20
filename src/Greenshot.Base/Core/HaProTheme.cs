@@ -48,6 +48,7 @@ namespace Greenshot.Base.Core
         public static readonly Color TextDisabled = Color.FromArgb(120, 120, 120);
 
         private static bool _appModeSet;
+        private static bool? _isDark;
 
         /// <summary>
         /// True when the editor should be painted dark.
@@ -56,10 +57,22 @@ namespace Greenshot.Base.Core
         {
             get
             {
+                // asked from paint handlers: read the ini once, and never through the saving overload
+                if (_isDark.HasValue)
+                {
+                    return _isDark.Value;
+                }
+
                 try
                 {
-                    var coreConfiguration = IniConfig.GetIniSection<CoreConfiguration>();
-                    return coreConfiguration != null && coreConfiguration.HaProDarkMode;
+                    var coreConfiguration = IniConfig.GetIniSection<CoreConfiguration>(false);
+                    if (coreConfiguration == null)
+                    {
+                        return false;
+                    }
+
+                    _isDark = coreConfiguration.HaProDarkMode;
+                    return _isDark.Value;
                 }
                 catch
                 {
