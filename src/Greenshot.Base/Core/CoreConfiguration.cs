@@ -327,6 +327,10 @@ namespace Greenshot.Base.Core
         [IniProperty("Win10BorderCrop", Description = "The capture is cropped with these settings, e.g. when you don't want to color around it -1,-1"), DefaultValue("0,0")]
         public NativeSize Win10BorderCrop { get; set; }
 
+        [IniProperty("HaProDarkMode", Description = "ha-pro: paint the image editor dark (title bar, menus, tool strips, canvas). False = upstream look.",
+            DefaultValue = "False")]
+        public bool HaProDarkMode { get; set; }
+
         private NativeSize _iconSize;
 
         [IniProperty("BaseIconSize",

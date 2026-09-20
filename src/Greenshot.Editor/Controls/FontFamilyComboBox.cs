@@ -24,6 +24,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using Dapplo.Windows.Common.Structs;
+using Greenshot.Base.Core;
 
 namespace Greenshot.Editor.Controls
 {
@@ -127,7 +128,9 @@ namespace Greenshot.Editor.Controls
             {
                 LineAlignment = StringAlignment.Center
             };
-            graphics.DrawString(text, font, Brushes.Black, bounds, stringFormat);
+            // ha-pro: light text on the dark list, black as before otherwise
+            using Brush textBrush = new SolidBrush(HaProTheme.IsDark ? HaProTheme.Text : Color.Black);
+            graphics.DrawString(text, font, textBrush, bounds, stringFormat);
         }
 
         private void BindableToolStripComboBox_SelectedIndexChanged(object sender, EventArgs e)

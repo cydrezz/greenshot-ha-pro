@@ -160,6 +160,8 @@ namespace Greenshot.Base.Core
                 {
                     var coreConfiguration = IniConfig.GetIniSection<CoreConfiguration>();
                     image = Render(glyph, coreConfiguration.IconSize, DefaultColor);
+                    // ha-pro: lets the dark editor re-render the glyph in its own color (HaProTheme.ForEditor)
+                    image.Tag = glyph;
                     ResourceCache[resourceName] = image;
                 }
 

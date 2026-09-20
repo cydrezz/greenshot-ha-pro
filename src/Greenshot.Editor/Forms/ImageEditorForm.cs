@@ -142,7 +142,7 @@ namespace Greenshot.Editor.Forms
                 return;
             }
 
-            Color color = FluentIcons.DefaultColor;
+            Color color = HaProTheme.IconColor;
 
             void Set(ToolStripItem item, char glyph, bool flipX = false, float rotate = 0f)
             {
@@ -275,6 +275,100 @@ namespace Greenshot.Editor.Forms
             }
         }
 
+        /// <summary>
+        /// ha-pro: paint the editor dark when the ini says HaProDarkMode=True.
+        /// Only colors and renderers are changed here, see HaProTheme for the limits
+        /// (settings dialog, color picker and the spin buttons stay light).
+        /// </summary>
+        private void ApplyHaProDarkMode()
+        {
+            if (!HaProTheme.IsDark)
+            {
+                return;
+            }
+
+            HaProTheme.ApplyTitleBar(Handle);
+            HandleCreated += delegate { HaProTheme.ApplyTitleBar(Handle); };
+
+            BackColor = HaProTheme.Background;
+            ForeColor = HaProTheme.Text;
+            tableLayoutPanel1.BackColor = HaProTheme.Background;
+            panel1.BackColor = HaProTheme.Canvas;
+            panel1.BorderStyle = BorderStyle.None;
+            HaProTheme.ApplyScrollBars(panel1);
+
+            var renderer = new HaProTheme.DarkToolStripRenderer();
+            foreach (ToolStrip strip in new ToolStrip[] { menuStrip1, toolsToolStrip, destinationsToolStrip, propertiesToolStrip, statusStrip1 })
+            {
+                strip.Renderer = renderer;
+                strip.BackColor = HaProTheme.Background;
+                strip.ForeColor = HaProTheme.Text;
+                strip.OverflowButton.DropDown.BackColor = HaProTheme.Background;
+            }
+
+            foreach (ToolStripPanel stripPanel in new[]
+                     {
+                         topToolStripContainer.TopToolStripPanel, topToolStripContainer.BottomToolStripPanel,
+                         topToolStripContainer.LeftToolStripPanel, topToolStripContainer.RightToolStripPanel
+                     })
+            {
+                stripPanel.Renderer = renderer;
+                stripPanel.BackColor = HaProTheme.Background;
+            }
+
+            topToolStripContainer.ContentPanel.Renderer = renderer;
+            topToolStripContainer.ContentPanel.BackColor = HaProTheme.Background;
+            topToolStripContainer.BackColor = HaProTheme.Background;
+
+            // the sunken 3D borders of the status labels are drawn with light system colors
+            dimensionsLabel.BorderSides = ToolStripStatusLabelBorderSides.None;
+            statusLabel.BorderSides = ToolStripStatusLabelBorderSides.None;
+
+            foreach (ToolStripItem item in propertiesToolStrip.Items)
+            {
+                if (item is ToolStripComboBox comboBox)
+                {
+                    comboBox.FlatStyle = FlatStyle.Flat;
+                    comboBox.BackColor = HaProTheme.Input;
+                    comboBox.ForeColor = HaProTheme.Text;
+                }
+                else if (item is ToolStripControlHost host && host.Control != null)
+                {
+                    host.Control.BackColor = HaProTheme.Input;
+                    host.Control.ForeColor = HaProTheme.Text;
+                    if (host.Control is NumericUpDown upDown)
+                    {
+                        // the 3D border is a white frame on the dark strip
+                        upDown.BorderStyle = BorderStyle.FixedSingle;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// ha-pro: destination menu items carry the dark glyphs meant for the light tray menu,
+        /// swap them for the editor color; the sub items are created when the drop-down opens.
+        /// </summary>
+        private static void ApplyHaProDarkIcons(ToolStripItem item)
+        {
+            if (!HaProTheme.IsDark || item == null)
+            {
+                return;
+            }
+
+            item.Image = HaProTheme.ForEditor(item.Image);
+            if (item is ToolStripDropDownItem dropDownItem)
+            {
+                dropDownItem.DropDownOpening += delegate
+                {
+                    foreach (ToolStripItem subItem in dropDownItem.DropDownItems)
+                    {
+                        subItem.Image = HaProTheme.ForEditor(subItem.Image);
+                    }
+                };
+            }
+        }
+
         public ImageEditorForm()
         {
             var image = ImageHelper.CreateEmpty(EditorConfiguration.DefaultEditorSize.Width, EditorConfiguration.DefaultEditorSize.Height, PixelFormat.Format32bppArgb, Color.White, 96f, 96f);
@@ -298,6 +392,7 @@ namespace Greenshot.Editor.Forms
             InitializeComponent();
             ApplyHaProFontScaling();
             ApplyHaProFluentIcons(coreConfiguration.IconSize);
+            ApplyHaProDarkMode();
             // Make sure we change the icon size depending on the scaling
             Load += delegate
             {
@@ -480,7 +575,7 @@ namespace Greenshot.Editor.Forms
         /// <param name="e"></param>
         private void PropertiesToolStrip_Paint(object sender, PaintEventArgs e)
         {
-            using Pen cbBorderPen = new Pen(SystemColors.ActiveBorder);
+            using Pen cbBorderPen = new Pen(HaProTheme.IsDark ? HaProTheme.Border : SystemColors.ActiveBorder);
             // Loop over all items in the propertiesToolStrip
             foreach (ToolStripItem item in propertiesToolStrip.Items)
             {
@@ -547,14 +642,14 @@ namespace Greenshot.Editor.Forms
                     DisplayStyle = ToolStripItemDisplayStyle.Image,
                     Size = new Size(23, 22),
                     Text = toolstripDestination.Description,
-                    Image = toolstripDestination.DisplayIcon
+                    Image = HaProTheme.ForEditor(toolstripDestination.DisplayIcon)
                 };
                 //ToolStripDropDownButton destinationButton = new ToolStripDropDownButton();
 
                 ToolStripMenuItem defaultItem = new ToolStripMenuItem(toolstripDestination.Description)
                 {
                     Tag = toolstripDestination,
-                    Image = toolstripDestination.DisplayIcon
+                    Image = HaProTheme.ForEditor(toolstripDestination.DisplayIcon)
                 };
                 defaultItem.Click += delegate { toolstripDestination.ExportCapture(true, _surface, _surface.CaptureDetails); };
 
@@ -578,7 +673,7 @@ namespace Greenshot.Editor.Forms
                             ToolStripMenuItem destinationMenuItem = new ToolStripMenuItem(closureFixedDestination.Description)
                             {
                                 Tag = closureFixedDestination,
-                                Image = closureFixedDestination.DisplayIcon
+                                Image = HaProTheme.ForEditor(closureFixedDestination.DisplayIcon)
                             };
                             destinationMenuItem.Click += delegate { closureFixedDestination.ExportCapture(true, _surface, _surface.CaptureDetails); };
                             destinationButton.DropDownItems.Add(destinationMenuItem);
@@ -595,7 +690,7 @@ namespace Greenshot.Editor.Forms
                 destinationButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
                 destinationButton.Size = new Size(23, 22);
                 destinationButton.Text = toolstripDestination.Description;
-                destinationButton.Image = toolstripDestination.DisplayIcon;
+                destinationButton.Image = HaProTheme.ForEditor(toolstripDestination.DisplayIcon);
                 destinationButton.Click += delegate { toolstripDestination.ExportCapture(true, _surface, _surface.CaptureDetails); };
             }
         }
@@ -639,6 +734,7 @@ namespace Greenshot.Editor.Forms
                 if (item != null)
                 {
                     item.ShortcutKeys = destination.EditorShortcutKeys;
+                    ApplyHaProDarkIcons(item);
                     fileStripMenuItem.DropDownItems.Add(item);
                 }
             }
@@ -1524,7 +1620,7 @@ namespace Greenshot.Editor.Forms
             if (FluentIcons.IsEnabled)
             {
                 // ha-pro: sharp counter at the real icon size
-                icon = FluentIcons.RenderCounter(stepLabels, toolsToolStrip.ImageScalingSize, FluentIcons.DefaultColor);
+                icon = FluentIcons.RenderCounter(stepLabels, toolsToolStrip.ImageScalingSize, HaProTheme.IconColor);
             }
             else if (stepLabels <= 20)
             {
