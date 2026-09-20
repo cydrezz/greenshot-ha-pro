@@ -204,6 +204,7 @@ namespace Greenshot.Editor.Drawing
         /// The selected element for the mouse down, do not serialize
         /// </summary>
         [NonSerialized] private IDrawableContainer _mouseDownElement;
+        [NonSerialized] private bool _haProHadSelectionOnMouseDown;
 
         /// <summary>
         /// all selected elements, do not serialize
@@ -1477,6 +1478,8 @@ namespace Greenshot.Editor.Drawing
 
             _mouseDown = true;
             _isSurfaceMoveMadeUndoable = false;
+            // ha-pro: remembered for the mouse up, a plain click next to a selected element only deselects
+            _haProHadSelectionOnMouseDown = selectedElements != null && selectedElements.Count > 0;
 
             if (_cropContainer != null && ((_undrawnElement == null) || (_undrawnElement != null && DrawingMode != DrawingModes.Crop)))
             {
@@ -1610,14 +1613,26 @@ namespace Greenshot.Editor.Drawing
                 {
                     _drawingElement.HandleMouseUp(currentMouse.X, currentMouse.Y);
                     _drawingElement.Invalidate();
-                    if (Math.Abs(_drawingElement.Width) < 5 && Math.Abs(_drawingElement.Height) < 5)
+                    bool isPlainClick = Math.Abs(_drawingElement.Width) < 5 && Math.Abs(_drawingElement.Height) < 5;
+                    if (isPlainClick && _haProHadSelectionOnMouseDown)
                     {
-                        _drawingElement.Width = 25;
-                        _drawingElement.Height = 25;
+                        // ha-pro: clicking away from the element just placed must not drop a second one,
+                        // upstream made a 25 x 25 element out of every click. Dragging still draws.
+                        _elements.Remove(_drawingElement);
+                        _drawingElement.Invalidate();
+                        DeselectAllElements();
                     }
+                    else
+                    {
+                        if (isPlainClick)
+                        {
+                            _drawingElement.Width = 25;
+                            _drawingElement.Height = 25;
+                        }
 
-                    SelectElement(_drawingElement);
-                    _drawingElement.Selected = true;
+                        SelectElement(_drawingElement);
+                        _drawingElement.Selected = true;
+                    }
                 }
 
                 _drawingElement = null;

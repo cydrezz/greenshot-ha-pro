@@ -2385,6 +2385,44 @@ namespace Greenshot.Editor.Forms
             {
                 ZoomSetValue(noZoom);
             }
+
+            HaProZoomForReading();
+        }
+
+        /// <summary>
+        /// ha-pro: a landscape monitor capture in a window on a portrait monitor fits only at 50 %, which is
+        /// not readable. With a kept window size the capture then opens at the biggest step that fits in the
+        /// HEIGHT, as long as at least half of the width stays visible: only sideways scrolling is left
+        /// (tilt wheel). The window itself is not touched.
+        /// </summary>
+        private void HaProZoomForReading()
+        {
+            if (!HaProKeepWindowSize || Surface?.Image == null)
+            {
+                return;
+            }
+
+            Fraction noZoom = (1, 1);
+            Fraction readable = (2, 3);
+            if (Surface.ZoomFactor >= readable)
+            {
+                return;
+            }
+
+            var imageSize = Surface.Image.Size;
+            // the panel without any scroll bar, minus the horizontal scroll bar that will appear
+            int maxWidth = panel1.Width;
+            int maxHeight = panel1.Height - SystemInformation.HorizontalScrollBarHeight - 2;
+            var index = Array.FindLastIndex(
+                ZOOM_VALUES,
+                zoom => zoom <= noZoom
+                        && (int) (imageSize.Height * zoom) <= maxHeight
+                        && (int) (imageSize.Width * zoom) <= 2 * maxWidth
+            );
+            if (index >= 0 && ZOOM_VALUES[index] > Surface.ZoomFactor)
+            {
+                ZoomSetValue(ZOOM_VALUES[index]);
+            }
         }
 
         private void ZoomBestFitMenuItemClick(object sender, EventArgs e)
