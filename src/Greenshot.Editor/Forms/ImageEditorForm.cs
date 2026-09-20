@@ -1400,6 +1400,27 @@ namespace Greenshot.Editor.Forms
             panel1.Focus();
         }
 
+        /// <summary>
+        /// ha-pro: tilting the wheel left/right scrolls the image horizontally.
+        /// Windows Forms has no event for WM_MOUSEHWHEEL, upstream ignores it.
+        /// </summary>
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_MOUSEHWHEEL = 0x020E;
+            if (m.Msg == WM_MOUSEHWHEEL && panel1 != null && panel1.HorizontalScroll.Visible)
+            {
+                // high word of wParam, signed: positive = tilted to the right
+                int delta = (short) ((m.WParam.ToInt64() >> 16) & 0xFFFF);
+                var position = panel1.AutoScrollPosition;
+                // AutoScrollPosition is read negative and written positive
+                panel1.AutoScrollPosition = new Point(-position.X + delta * 40 / 120, -position.Y);
+                m.Result = IntPtr.Zero;
+                return;
+            }
+
+            base.WndProc(ref m);
+        }
+
         protected override bool ProcessKeyPreview(ref Message msg)
         {
             // disable default key handling if surface has requested a lock
