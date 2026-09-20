@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Greenshot - a free and open source screenshot tool
  * Copyright (C) 2007-2021 Thomas Braun, Jens Klingen, Robin Krom
  *
@@ -407,8 +407,17 @@ namespace Greenshot.Editor.Forms
             // Make sure the editor is placed on the same location as the last editor was on close
             // But only if this still exists, else it will be reset (BUG-1812)
             WindowPlacement editorWindowPlacement = EditorConfiguration.GetEditorPlacement();
-            NativeRect screenBounds = DisplayInfo.ScreenBounds;
-            if (!screenBounds.Contains(editorWindowPlacement.NormalPosition))
+            // ha-pro: upstream asked for the window to lie completely inside the screens. A window snapped to the
+            // full width of a screen is 7 px wider on each side (invisible resize borders), so exactly the
+            // placement the user chose was thrown away. A good part of it on any screen is enough.
+            var normalPosition = editorWindowPlacement.NormalPosition;
+            var keptRectangle = new Rectangle(normalPosition.Left, normalPosition.Top, normalPosition.Width, normalPosition.Height);
+            bool isOnAScreen = Screen.AllScreens.Any(screen =>
+            {
+                var visiblePart = Rectangle.Intersect(screen.WorkingArea, keptRectangle);
+                return visiblePart.Width >= 200 && visiblePart.Height >= 100;
+            });
+            if (!isOnAScreen)
             {
                 EditorConfiguration.ResetEditorPlacement();
             }
@@ -1235,10 +1244,11 @@ namespace Greenshot.Editor.Forms
 
             // persist our geometry string.
             var placementToKeep = new WindowDetails(Handle).WindowPlacement;
-            if (_haProAutoMaximized && placementToKeep.ShowCmd == Dapplo.Windows.User32.Enums.ShowWindowCommands.ShowMaximized)
+            if (_haProAutoMaximized)
             {
-                // ha-pro: maximized only for a big capture, the next editor opens in the kept size again
+                // ha-pro: maximized only for a big capture, the next editor opens in the kept place and size again
                 placementToKeep.ShowCmd = Dapplo.Windows.User32.Enums.ShowWindowCommands.Normal;
+                placementToKeep.NormalPosition = new NativeRect(_haProKeptBounds.X, _haProKeptBounds.Y, _haProKeptBounds.Width, _haProKeptBounds.Height);
             }
 
             EditorConfiguration.SetEditorPlacement(placementToKeep);
@@ -2242,10 +2252,29 @@ namespace Greenshot.Editor.Forms
         // ha-pro: true while the editor is maximized by HaProUseFullAreaIfNeeded and not by the user
         private bool _haProAutoMaximized;
 
+        // ha-pro: where the window was before HaProUseFullAreaIfNeeded maximized it
+        private Rectangle _haProKeptBounds;
+
         /// <summary>
-        /// ha-pro: with a kept window size, a capture that does not fit into the kept window at 100%
-        /// (a whole monitor) maximizes the editor; the next capture that fits brings the kept size back.
-        /// Windows keeps the normal position while maximized, so nothing has to be remembered here.
+        /// ha-pro: the biggest zoom step (never above 100%) that shows the whole image inside the given size.
+        /// </summary>
+        private Fraction HaProBestZoom(Size imageSize, Size maxImageSize)
+        {
+            Fraction noZoom = (1, 1);
+            var index = Array.FindLastIndex(
+                ZOOM_VALUES,
+                zoom => zoom <= noZoom
+                        && (int) (imageSize.Width * zoom) <= maxImageSize.Width
+                        && (int) (imageSize.Height * zoom) <= maxImageSize.Height
+            );
+            return index < 0 ? ZOOM_VALUES[0] : ZOOM_VALUES[index];
+        }
+
+        /// <summary>
+        /// ha-pro: with a kept window size, a capture that would be shown bigger on a whole screen than in
+        /// the kept window (a whole monitor) maximizes the editor on the screen that shows it biggest -
+        /// the kept window may sit on a portrait screen where maximizing gains nothing. The next capture
+        /// that gains nothing brings the kept position and size back.
         /// </summary>
         private void HaProUseFullAreaIfNeeded()
         {
@@ -2254,35 +2283,69 @@ namespace Greenshot.Editor.Forms
                 return;
             }
 
-            bool isMaximized = WindowState == FormWindowState.Maximized;
-            if (isMaximized && !_haProAutoMaximized)
+            if (WindowState == FormWindowState.Maximized && !_haProAutoMaximized)
             {
                 // maximized by the user, leave it alone
                 return;
             }
 
-            var keptSize = isMaximized ? (Size) new WindowDetails(Handle).WindowPlacement.NormalPosition.Size : Size;
-            var keptImageSize = keptSize - GetChromeSize();
-            var imageSize = Surface.Image.Size;
-            bool fits = imageSize.Width <= keptImageSize.Width && imageSize.Height <= keptImageSize.Height;
-
-            if (!fits && !isMaximized)
+            if (WindowState == FormWindowState.Minimized)
             {
-                _haProAutoMaximized = true;
-                WindowState = FormWindowState.Maximized;
-                if (!Visible)
+                WindowState = FormWindowState.Normal;
+            }
+
+            var chromeSize = GetChromeSize();
+            var imageSize = Surface.Image.Size;
+            var keptBounds = _haProAutoMaximized ? _haProKeptBounds : Bounds;
+            var bestZoom = HaProBestZoom(imageSize, keptBounds.Size - chromeSize);
+
+            // the screen of the kept window first, then the nearest ones: only a real gain moves the window
+            Screen bestScreen = null;
+            var keptCenter = new Point(keptBounds.Left + keptBounds.Width / 2, keptBounds.Top + keptBounds.Height / 2);
+            var screens = Screen.AllScreens.OrderBy(screen =>
+            {
+                var area = screen.WorkingArea;
+                long dx = area.Left + area.Width / 2 - keptCenter.X;
+                long dy = area.Top + area.Height / 2 - keptCenter.Y;
+                return dx * dx + dy * dy;
+            });
+            foreach (var screen in screens)
+            {
+                var zoom = HaProBestZoom(imageSize, screen.WorkingArea.Size - chromeSize);
+                if (zoom > bestZoom)
                 {
-                    // a hidden form only notes the state, the size follows when it is shown: fit again then
-                    Shown += HaProFitAfterShown;
+                    bestZoom = zoom;
+                    bestScreen = screen;
                 }
             }
-            else if (fits && _haProAutoMaximized)
+
+            if (bestScreen == null)
             {
-                _haProAutoMaximized = false;
-                if (isMaximized)
+                if (_haProAutoMaximized)
                 {
+                    _haProAutoMaximized = false;
                     WindowState = FormWindowState.Normal;
+                    Bounds = _haProKeptBounds;
                 }
+
+                return;
+            }
+
+            if (_haProAutoMaximized && WindowState == FormWindowState.Maximized && Screen.FromControl(this).Equals(bestScreen))
+            {
+                return;
+            }
+
+            _haProKeptBounds = keptBounds;
+            _haProAutoMaximized = true;
+            WindowState = FormWindowState.Normal;
+            // a window maximizes on the screen it sits on
+            Location = bestScreen.WorkingArea.Location;
+            WindowState = FormWindowState.Maximized;
+            if (!Visible)
+            {
+                // a hidden form only notes the state, the size follows when it is shown: fit again then
+                Shown += HaProFitAfterShown;
             }
         }
 
