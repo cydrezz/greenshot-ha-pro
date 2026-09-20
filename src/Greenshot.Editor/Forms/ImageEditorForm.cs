@@ -511,8 +511,6 @@ namespace Greenshot.Editor.Forms
 
                 BindFieldControls();
                 RefreshEditorControls();
-                // ha-pro: a capture that is too big for the kept window gets the whole screen for as long as it is shown
-                HaProUseFullAreaIfNeeded();
                 // ha-pro: always show the new capture completely (shrink to fit, never enlarge)
                 ZoomShrinkToFit();
                 // Fix title
@@ -1245,12 +1243,6 @@ namespace Greenshot.Editor.Forms
 
             // persist our geometry string.
             var placementToKeep = new WindowDetails(Handle).WindowPlacement;
-            if (_haProAutoMaximized)
-            {
-                // ha-pro: maximized only for a big capture, the next editor opens in the kept place and size again
-                placementToKeep.ShowCmd = Dapplo.Windows.User32.Enums.ShowWindowCommands.Normal;
-                placementToKeep.NormalPosition = new NativeRect(_haProKeptBounds.X, _haProKeptBounds.Y, _haProKeptBounds.Width, _haProKeptBounds.Height);
-            }
 
             EditorConfiguration.SetEditorPlacement(placementToKeep);
             IniConfig.Save();
@@ -2280,100 +2272,6 @@ namespace Greenshot.Editor.Forms
             propertiesToolStrip.Visible = false;
         }
 
-        // ha-pro: true while the editor is maximized by HaProUseFullAreaIfNeeded and not by the user
-        private bool _haProAutoMaximized;
-
-        // ha-pro: where the window was before HaProUseFullAreaIfNeeded maximized it
-        private Rectangle _haProKeptBounds;
-
-        /// <summary>
-        /// ha-pro: the biggest zoom step (never above 100%) that shows the whole image inside the given size.
-        /// </summary>
-        private Fraction HaProBestZoom(Size imageSize, Size maxImageSize)
-        {
-            Fraction noZoom = (1, 1);
-            var index = Array.FindLastIndex(
-                ZOOM_VALUES,
-                zoom => zoom <= noZoom
-                        && (int) (imageSize.Width * zoom) <= maxImageSize.Width
-                        && (int) (imageSize.Height * zoom) <= maxImageSize.Height
-            );
-            return index < 0 ? ZOOM_VALUES[0] : ZOOM_VALUES[index];
-        }
-
-        /// <summary>
-        /// ha-pro: with a kept window size, a capture that would be shown bigger maximized than in the kept
-        /// window (a whole monitor) maximizes the editor on its own screen; the next capture that gains
-        /// nothing brings the kept position and size back. The editor never moves to another screen.
-        /// </summary>
-        private void HaProUseFullAreaIfNeeded()
-        {
-            if (!HaProKeepWindowSize || Surface?.Image == null)
-            {
-                return;
-            }
-
-            if (WindowState == FormWindowState.Maximized && !_haProAutoMaximized)
-            {
-                // maximized by the user, leave it alone
-                return;
-            }
-
-            if (WindowState == FormWindowState.Minimized)
-            {
-                WindowState = FormWindowState.Normal;
-            }
-
-            var chromeSize = GetChromeSize();
-            var imageSize = Surface.Image.Size;
-            var keptBounds = _haProAutoMaximized ? _haProKeptBounds : Bounds;
-            var bestZoom = HaProBestZoom(imageSize, keptBounds.Size - chromeSize);
-
-            // only the screen the kept window sits on: the editor never jumps to another screen.
-            // On a portrait screen a landscape monitor capture gains nothing, then the kept window stays as it is.
-            Screen bestScreen = null;
-            var keptScreen = Screen.FromRectangle(keptBounds);
-            if (HaProBestZoom(imageSize, keptScreen.WorkingArea.Size - chromeSize) > bestZoom)
-            {
-                bestScreen = keptScreen;
-            }
-
-            if (bestScreen == null)
-            {
-                if (_haProAutoMaximized)
-                {
-                    _haProAutoMaximized = false;
-                    WindowState = FormWindowState.Normal;
-                    Bounds = _haProKeptBounds;
-                }
-
-                return;
-            }
-
-            if (_haProAutoMaximized && WindowState == FormWindowState.Maximized && Screen.FromControl(this).Equals(bestScreen))
-            {
-                return;
-            }
-
-            _haProKeptBounds = keptBounds;
-            _haProAutoMaximized = true;
-            WindowState = FormWindowState.Normal;
-            // a window maximizes on the screen it sits on
-            Location = bestScreen.WorkingArea.Location;
-            WindowState = FormWindowState.Maximized;
-            if (!Visible)
-            {
-                // a hidden form only notes the state, the size follows when it is shown: fit again then
-                Shown += HaProFitAfterShown;
-            }
-        }
-
-        private void HaProFitAfterShown(object sender, EventArgs e)
-        {
-            Shown -= HaProFitAfterShown;
-            ZoomShrinkToFit();
-        }
-
         /// <summary>
         /// ha-pro: zoom out until the whole image is visible, but never enlarge beyond 100%.
         /// </summary>
@@ -2390,10 +2288,10 @@ namespace Greenshot.Editor.Forms
         }
 
         /// <summary>
-        /// ha-pro: a landscape monitor capture in a window on a portrait monitor fits only at 50 %, which is
-        /// not readable. With a kept window size the capture then opens at the biggest step that fits in the
-        /// HEIGHT, as long as at least half of the width stays visible: only sideways scrolling is left
-        /// (tilt wheel). The window itself is not touched.
+        /// ha-pro: a whole monitor capture fits into the kept window only at 50 % or less, which is not readable.
+        /// With a kept window size the capture then opens at the biggest step where ONE direction fits and at
+        /// least half of the other stays visible: a landscape capture scrolls sideways only (tilt wheel),
+        /// a portrait capture up and down only. The window itself is never touched.
         /// </summary>
         private void HaProZoomForReading()
         {
@@ -2410,14 +2308,16 @@ namespace Greenshot.Editor.Forms
             }
 
             var imageSize = Surface.Image.Size;
-            // the panel without any scroll bar, minus the horizontal scroll bar that will appear
-            int maxWidth = panel1.Width;
-            int maxHeight = panel1.Height - SystemInformation.HorizontalScrollBarHeight - 2;
+            // the panel without any scroll bar, minus the one scroll bar that will appear
+            int fullWidth = panel1.Width;
+            int fullHeight = panel1.Height;
+            int widthBesideBar = fullWidth - SystemInformation.VerticalScrollBarWidth - 2;
+            int heightAboveBar = fullHeight - SystemInformation.HorizontalScrollBarHeight - 2;
             var index = Array.FindLastIndex(
                 ZOOM_VALUES,
                 zoom => zoom <= noZoom
-                        && (int) (imageSize.Height * zoom) <= maxHeight
-                        && (int) (imageSize.Width * zoom) <= 2 * maxWidth
+                        && (((int) (imageSize.Height * zoom) <= heightAboveBar && (int) (imageSize.Width * zoom) <= 2 * fullWidth)
+                            || ((int) (imageSize.Width * zoom) <= widthBesideBar && (int) (imageSize.Height * zoom) <= 2 * fullHeight))
             );
             if (index >= 0 && ZOOM_VALUES[index] > Surface.ZoomFactor)
             {

@@ -445,6 +445,18 @@ namespace Greenshot.Forms
                 // Go and process the capture
                 DialogResult = DialogResult.OK;
             }
+            else if (_captureMode == CaptureMode.Region && (ModifierKeys & Keys.Control) == Keys.Control && _selectedCaptureWindow != null)
+            {
+                // ha-pro: Ctrl + click captures the window under the cursor (a popup, a dialog), cut out of the
+                // frozen screen like a dragged region. Space still switches to the upstream window mode.
+                var windowRectangle = _selectedCaptureWindow.WindowRectangle
+                    .Offset(-_capture.ScreenBounds.Location.X, -_capture.ScreenBounds.Location.Y);
+                _captureRect = windowRectangle.Intersect(new NativeRect(0, 0, _capture.ScreenBounds.Width, _capture.ScreenBounds.Height));
+                if (_captureRect.Width > 0 && _captureRect.Height > 0)
+                {
+                    DialogResult = DialogResult.OK;
+                }
+            }
             else if (_captureMode == CaptureMode.Region)
             {
                 // ha-pro: a plain click without dragging captures the monitor under the cursor.
