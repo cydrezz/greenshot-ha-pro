@@ -91,7 +91,8 @@ namespace Greenshot.Editor.Forms
         /// </summary>
         private readonly Fraction[] ZOOM_VALUES = new Fraction[]
         {
-            (1, 4), (1, 2), (2, 3), (3, 4), (1, 1), (2, 1), (3, 1), (4, 1), (6, 1)
+            // ha-pro: 1/3 added, so a monitor-sized capture in a kept (smaller) window does not drop straight to 25%
+            (1, 4), (1, 3), (1, 2), (2, 3), (3, 4), (1, 1), (2, 1), (3, 1), (4, 1), (6, 1)
         };
 
         public static List<IImageEditor> Editors
@@ -2203,6 +2204,12 @@ namespace Greenshot.Editor.Forms
         }
 
         /// <summary>
+        /// ha-pro: "match size to capture" switched off means the window keeps the size (and position)
+        /// the user gave it, also when the zoom changes. Upstream resized on every zoom change regardless.
+        /// </summary>
+        private static bool HaProKeepWindowSize => !EditorConfiguration.MatchSizeToCapture;
+
+        /// <summary>
         /// ha-pro: zoom out until the whole image is visible, but never enlarge beyond 100%.
         /// </summary>
         private void ZoomShrinkToFit()
@@ -2219,7 +2226,8 @@ namespace Greenshot.Editor.Forms
         {
             var maxWindowSize = GetAvailableScreenSpace();
             var chromeSize = GetChromeSize();
-            var maxImageSize = maxWindowSize - chromeSize;
+            // ha-pro: with a kept window size the image has to fit into the window as it is, not into the screen
+            var maxImageSize = HaProKeepWindowSize ? panel1.ClientSize : maxWindowSize - chromeSize;
             var imageSize = Surface.Image.Size;
 
             static bool isFit(Fraction scale, int source, int boundary)
@@ -2279,7 +2287,11 @@ namespace Greenshot.Editor.Forms
 
             // Set the new zoom value
             Surface.ZoomFactor = value;
-            Size = GetOptimalWindowSize();
+            if (!HaProKeepWindowSize)
+            {
+                Size = GetOptimalWindowSize();
+            }
+
             AlignCanvasPositionAfterResize();
 
             // Update zoom controls
