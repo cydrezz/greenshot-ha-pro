@@ -33,6 +33,7 @@ using Dapplo.Windows.Common.Structs;
 using Dapplo.Windows.Dpi;
 using Dapplo.Windows.Kernel32;
 using Dapplo.Windows.User32;
+using Dapplo.Windows.User32.Enums;
 using Dapplo.Windows.User32.Structs;
 using Greenshot.Base;
 using Greenshot.Base.Controls;
@@ -423,10 +424,20 @@ namespace Greenshot.Editor.Forms
                 EditorConfiguration.ResetEditorPlacement();
             }
 
+            // ha-pro: a placement stored while the editor was minimized (editor closed or Greenshot shut down
+            // in that state) must not minimize the new editor before it was ever shown. WinForms then has no
+            // real restore bounds, and the WindowState = Normal in HaProBringToFront restores the minimized
+            // placeholder: a 136x39 window at -32000,-32000 that counts as visible but is nowhere to see (22.10.2026).
+            var placementToApply = EditorConfiguration.GetEditorPlacement();
+            if (IsMinimizedOrHidden(placementToApply.ShowCmd))
+            {
+                placementToApply.ShowCmd = ShowWindowCommands.Normal;
+            }
+
             // ReSharper disable once UnusedVariable
             WindowDetails thisForm = new(Handle)
             {
-                WindowPlacement = EditorConfiguration.GetEditorPlacement()
+                WindowPlacement = placementToApply
             };
 
             // init surface
@@ -532,6 +543,25 @@ namespace Greenshot.Editor.Forms
         /// window in the z-order; Activate/ToForeground then take the keyboard focus
         /// whenever Windows allows it.
         /// </summary>
+        /// <summary>
+        /// ha-pro: show commands that would leave the editor minimized or hidden. A stored placement
+        /// with one of them is applied as Normal (see constructor) and never written back (see closing).
+        /// </summary>
+        private static bool IsMinimizedOrHidden(ShowWindowCommands showCmd)
+        {
+            switch (showCmd)
+            {
+                case ShowWindowCommands.Hide:
+                case ShowWindowCommands.ShowMinimized:
+                case ShowWindowCommands.Minimize:
+                case ShowWindowCommands.ShowMinNoActivation:
+                case ShowWindowCommands.ForceMinimize:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private void HaProBringToFront()
         {
             if (WindowState == FormWindowState.Minimized)
@@ -1243,6 +1273,11 @@ namespace Greenshot.Editor.Forms
 
             // persist our geometry string.
             var placementToKeep = new WindowDetails(Handle).WindowPlacement;
+            // ha-pro: never remember a minimized or hidden editor, the next one has to be visible
+            if (IsMinimizedOrHidden(placementToKeep.ShowCmd))
+            {
+                placementToKeep.ShowCmd = ShowWindowCommands.Normal;
+            }
 
             EditorConfiguration.SetEditorPlacement(placementToKeep);
             IniConfig.Save();
