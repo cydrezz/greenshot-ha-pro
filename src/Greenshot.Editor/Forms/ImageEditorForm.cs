@@ -184,6 +184,7 @@ namespace Greenshot.Editor.Forms
             Set(toolStripSplitButton1, FluentIcons.Effects);
             Set(btnResize, FluentIcons.Resize);
             Set(btnCrop, FluentIcons.Crop);
+            Set(btnHaProSelect, FluentIcons.SelectArea);
             Set(cropModeButton, FluentIcons.Crop);
             Set(defaultCropModeToolStripMenuItem, FluentIcons.Crop);
             Set(verticalCropModeToolStripMenuItem, FluentIcons.CropVertical);
@@ -593,7 +594,8 @@ namespace Greenshot.Editor.Forms
 
             _toolbarButtons = new[]
             {
-                btnCursor, btnRect, btnEllipse, btnText, btnLine, btnArrow, btnFreehand, btnHighlight, btnObfuscate, btnCrop, btnStepLabel, btnSpeechBubble
+                btnCursor, btnRect, btnEllipse, btnText, btnLine, btnArrow, btnFreehand, btnHighlight, btnObfuscate, btnCrop, btnStepLabel, btnSpeechBubble,
+                btnHaProSelect
             };
             //toolbarDropDownButtons = new ToolStripDropDownButton[]{btnBlur, btnPixeliate, btnTextHighlighter, btnAreaHighlighter, btnMagnifier};
 
@@ -931,6 +933,9 @@ namespace Greenshot.Editor.Forms
                 case DrawingModes.Crop:
                     SetButtonChecked(btnCrop);
                     break;
+                case DrawingModes.HaProSelect:
+                    SetButtonChecked(btnHaProSelect);
+                    break;
                 case DrawingModes.Highlight:
                     SetButtonChecked(btnHighlight);
                     break;
@@ -1034,6 +1039,18 @@ namespace Greenshot.Editor.Forms
 
             _surface.DrawingMode = DrawingModes.Crop;
             InitCropMode((CropContainer.CropModes)_surface.FieldAggregator.GetField(FieldType.CROPMODE).Value);
+            RefreshFieldControls();
+        }
+
+        /// <summary>
+        /// ha-pro: select-area tool, drag a rectangle and confirm (Enter or the check mark):
+        /// the pixels inside become a movable image element, the source stays untouched.
+        /// </summary>
+        private void BtnHaProSelectClick(object sender, EventArgs e)
+        {
+            if (_surface.DrawingMode == DrawingModes.HaProSelect) return;
+
+            _surface.DrawingMode = DrawingModes.HaProSelect;
             RefreshFieldControls();
         }
 
@@ -1338,6 +1355,9 @@ namespace Greenshot.Editor.Forms
                         break;
                     case Keys.C:
                         BtnCropClick(sender, e);
+                        break;
+                    case Keys.B: // ha-pro: Bereich (select area)
+                        BtnHaProSelectClick(sender, e);
                         break;
                     case Keys.Z:
                         BtnResizeClick(sender, e);

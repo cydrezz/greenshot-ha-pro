@@ -227,6 +227,16 @@ namespace Greenshot.Editor.Drawing
         [NonSerialized] private IDrawableContainer _cropContainer;
 
         /// <summary>
+        /// ha-pro: the rectangle of the select-area tool, set while selecting, do not serialize
+        /// </summary>
+        [NonSerialized] private IDrawableContainer _haProSelectContainer;
+
+        /// <summary>
+        /// ha-pro: read once, the ini switch HaProGrowCanvas (section Editor)
+        /// </summary>
+        private static readonly bool HaProGrowCanvasEnabled = IniConfig.GetIniSection<EditorConfiguration>().HaProGrowCanvas;
+
+        /// <summary>
         /// the brush which is used for transparent backgrounds, set by the editor, do not serialize
         /// </summary>
         [NonSerialized] private Brush _transparencyBackgroundBrush;
@@ -610,6 +620,12 @@ namespace Greenshot.Editor.Drawing
                     _cropContainer.Dispose();
                     _cropContainer = null;
                 }
+
+                if (_haProSelectContainer != null)
+                {
+                    _haProSelectContainer.Dispose();
+                    _haProSelectContainer = null;
+                }
             }
 
             base.Dispose(disposing);
@@ -794,6 +810,10 @@ namespace Greenshot.Editor.Drawing
                 case DrawingModes.Crop:
                     _cropContainer = new CropContainer(this);
                     _undrawnElement = _cropContainer;
+                    break;
+                case DrawingModes.HaProSelect:
+                    _haProSelectContainer = new HaProSelectContainer(this);
+                    _undrawnElement = _haProSelectContainer;
                     break;
                 case DrawingModes.Bitmap:
                     _undrawnElement = new ImageContainer(this);
@@ -1488,6 +1508,14 @@ namespace Greenshot.Editor.Drawing
                 _drawingElement = null;
             }
 
+            // ha-pro: a new drag replaces the pending selection rectangle, same rule as the crop rectangle
+            if (_haProSelectContainer != null && ((_undrawnElement == null) || (_undrawnElement != null && DrawingMode != DrawingModes.HaProSelect)))
+            {
+                RemoveElement(_haProSelectContainer, false);
+                _haProSelectContainer = null;
+                _drawingElement = null;
+            }
+
             if (_drawingElement == null && DrawingMode != DrawingModes.None)
             {
                 if (_undrawnElement == null)
@@ -1548,6 +1576,7 @@ namespace Greenshot.Editor.Drawing
             if (adorner != null)
             {
                 adorner.MouseUp(sender, e);
+                HaProGrowCanvasToElements();
                 return;
             }
 
@@ -1637,6 +1666,61 @@ namespace Greenshot.Editor.Drawing
 
                 _drawingElement = null;
             }
+
+            HaProGrowCanvasToElements();
+        }
+
+        /// <summary>
+        /// ha-pro: an element drawn, moved or resized past the edge of the image enlarges the canvas
+        /// so it stays visible (upstream clipped it). The added strip takes the default canvas color
+        /// (transparent for images with alpha, white otherwise), like Image -> Enlarge canvas.
+        /// Only the geometry (Bounds) decides, a line end poking out by its own thickness does not grow
+        /// anything; once it grows, the stroke and shadow (DrawingBounds) fit as well. Undoable like
+        /// any canvas change. Ini switch: HaProGrowCanvas=False (section Editor).
+        /// </summary>
+        private void HaProGrowCanvasToElements()
+        {
+            if (!HaProGrowCanvasEnabled || _image == null || _elements.Count == 0)
+            {
+                return;
+            }
+
+            var imageRectangle = new NativeRect(0, 0, _image.Width, _image.Height);
+            var needed = imageRectangle;
+            foreach (var element in _elements)
+            {
+                if (element is CropContainer || element is HaProSelectContainer)
+                {
+                    continue;
+                }
+
+                var bounds = element.Bounds;
+                if (bounds.Width <= 0 || bounds.Height <= 0 || imageRectangle.Contains(bounds))
+                {
+                    continue;
+                }
+
+                needed = needed.Union(element.DrawingBounds);
+            }
+
+            if (needed.Equals(imageRectangle))
+            {
+                return;
+            }
+
+            int left = imageRectangle.Left - needed.Left;
+            int top = imageRectangle.Top - needed.Top;
+            int right = needed.Right - imageRectangle.Right;
+            int bottom = needed.Bottom - imageRectangle.Bottom;
+
+            var matrix = new Matrix();
+            Image newImage = ImageHelper.ResizeCanvas(_image, Color.Empty, left, right, top, bottom, matrix);
+            _elements.Transform(matrix);
+            MakeUndoable(new SurfaceBackgroundChangeMemento(this, matrix), false);
+            SetImage(newImage, false);
+            _surfaceSizeChanged?.Invoke(this, null);
+            Invalidate();
+            LOG.DebugFormat("ha-pro: canvas grown by {0},{1},{2},{3} (left, top, right, bottom) to {4}", left, top, right, bottom, newImage.Size);
         }
 
         /// <summary>
@@ -2132,10 +2216,67 @@ namespace Greenshot.Editor.Drawing
             {
                 ConfirmCrop(confirm);
             }
+            else if (DrawingMode == DrawingModes.HaProSelect)
+            {
+                ConfirmHaProSelection(confirm);
+            }
             else
             {
                 ConfirmSelectedConfirmableElements(confirm);
             }
+        }
+
+        /// <summary>
+        /// ha-pro: confirm/cancel the select-area rectangle (Enter/Escape or the check/cross in the editor).
+        /// Confirming copies the visible pixels inside the rectangle (image plus elements, as exported)
+        /// into a new ImageContainer at the same place and selects it. The source stays untouched,
+        /// so the copy can be dragged elsewhere. Undo removes the copy again.
+        /// </summary>
+        /// <param name="confirm">bool</param>
+        public void ConfirmHaProSelection(bool confirm)
+        {
+            if (_haProSelectContainer == null) return;
+
+            var selection = _haProSelectContainer.Bounds;
+            RemoveHaProSelectContainer();
+            DrawingMode = DrawingModes.None;
+
+            if (confirm && _image != null)
+            {
+                selection = selection.Intersect(new NativeRect(0, 0, _image.Width, _image.Height));
+                if (selection.Width > 0 && selection.Height > 0)
+                {
+                    Bitmap copy;
+                    using (Image flattened = GetImageForExport())
+                    {
+                        copy = ImageHelper.CloneArea(flattened, selection, PixelFormat.DontCare);
+                    }
+
+                    using (copy)
+                    {
+                        // the ImageContainer clones the image, the copy is only needed until then
+                        IImageContainer container = AddImageContainer(copy, selection.X, selection.Y);
+                        SelectElement(container);
+                    }
+
+                    LOG.DebugFormat("ha-pro: selection {0} copied as image element", selection);
+                }
+            }
+
+            // maybe the undo button has to be enabled
+            _movingElementChanged?.Invoke(this, new SurfaceElementEventArgs());
+        }
+
+        /// <summary>
+        /// ha-pro: drop a pending select-area rectangle without creating anything
+        /// </summary>
+        public void RemoveHaProSelectContainer()
+        {
+            if (_haProSelectContainer == null) return;
+
+            RemoveElement(_haProSelectContainer, false);
+            _haProSelectContainer.Dispose();
+            _haProSelectContainer = null;
         }
 
         /// <summary>

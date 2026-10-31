@@ -65,6 +65,8 @@ namespace Greenshot.Base.Core
         public const char Crop = '';
         public const char CropVertical = '';
         public const char CropHorizontal = '';
+        // dashed rectangle with a plus, rendered and checked 31.10.2026 (select area tool)
+        public const char SelectArea = '\uEF20';
         public const char Resize = '';
         public const char Rotate = '';
         public const char Effects = '';

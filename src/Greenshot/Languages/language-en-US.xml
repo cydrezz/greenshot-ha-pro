@@ -94,6 +94,7 @@ Also, we would highly appreciate if you checked whether a tracker item already e
 		<resource name="editor_copypathtoclipboard">Copy path to clipboard</resource>
 		<resource name="editor_copytoclipboard">Copy</resource>
 		<resource name="editor_crop">Crop (C)</resource>
+		<resource name="editor_hapro_select">Select area and copy it as image (B)</resource>
 		<resource name="editor_crop_mode">Crop mode</resource>
 		<resource name="editor_cropmode_default">Crop</resource>
 		<resource name="editor_cropmode_vertical">Crop out vertically</resource>

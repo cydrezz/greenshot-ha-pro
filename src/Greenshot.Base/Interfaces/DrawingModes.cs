@@ -35,6 +35,10 @@ namespace Greenshot.Base.Interfaces
         Bitmap,
         Path,
         SpeechBubble,
-        StepLabel
+        StepLabel,
+        /// <summary>
+        /// ha-pro: drag a rectangle, confirm, and the pixels inside become a movable image element (the source stays untouched)
+        /// </summary>
+        HaProSelect
     }
 }

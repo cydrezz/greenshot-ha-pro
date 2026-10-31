@@ -81,6 +81,7 @@ namespace Greenshot.Editor.Forms {
 			this.btnResize = new GreenshotToolStripButton();
 			this.toolStripSeparator13 = new System.Windows.Forms.ToolStripSeparator();
 			this.btnCrop = new GreenshotToolStripButton();
+			this.btnHaProSelect = new GreenshotToolStripButton();
 			this.rotateCwToolstripButton = new GreenshotToolStripButton();
 			this.rotateCcwToolstripButton = new GreenshotToolStripButton();
 			this.menuStrip1 = new MenuStripEx();
@@ -342,6 +343,7 @@ namespace Greenshot.Editor.Forms {
 									this.toolStripSplitButton1,
 									this.toolStripSeparator13,
 									this.btnCrop,
+									this.btnHaProSelect,
 									this.rotateCwToolstripButton,
 									this.rotateCcwToolstripButton,
 									this.btnResize});
@@ -535,7 +537,16 @@ namespace Greenshot.Editor.Forms {
 			this.btnCrop.LanguageKey = "editor_crop";
 			this.btnCrop.Name = "btnCrop";
 			this.btnCrop.Click += new System.EventHandler(this.BtnCropClick);
-			// 
+			//
+			// btnHaProSelect (ha-pro: select area and copy it as image element)
+			//
+			this.btnHaProSelect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+			this.btnHaProSelect.Image = ((System.Drawing.Image)(resources.GetObject("btnCopy.Image")));
+			this.btnHaProSelect.ImageTransparentColor = System.Drawing.Color.Magenta;
+			this.btnHaProSelect.LanguageKey = "editor_hapro_select";
+			this.btnHaProSelect.Name = "btnHaProSelect";
+			this.btnHaProSelect.Click += new System.EventHandler(this.BtnHaProSelectClick);
+			//
 			// rotateCwToolstripButton
 			// 
 			this.rotateCwToolstripButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
@@ -1960,6 +1971,7 @@ namespace Greenshot.Editor.Forms {
 		private GreenshotToolStripButton btnObfuscate;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator13;
 		private GreenshotToolStripButton btnCrop;
+		private GreenshotToolStripButton btnHaProSelect;
 		private GreenshotToolStripMenuItem openDirectoryMenuItem;
 		private GreenshotToolStripMenuItem copyPathMenuItem;
 		private System.Windows.Forms.ContextMenuStrip fileSavedStatusContextMenu;

@@ -93,6 +93,7 @@ schnell zu finden. Vielen Dank :)</resource>
 		<resource name="editor_copypathtoclipboard">Pfad in Zwischenablage kopieren</resource>
 		<resource name="editor_copytoclipboard">Kopieren</resource>
 		<resource name="editor_crop">Zuschneiden (C)</resource>
+		<resource name="editor_hapro_select">Bereich auswählen und als Bild kopieren (B)</resource>
 		<resource name="editor_crop_mode">Zuschneiden - Modus</resource>
 		<resource name="editor_cropmode_default">Zuschneiden</resource>
 		<resource name="editor_cropmode_vertical">Vertikal ausschneiden</resource>

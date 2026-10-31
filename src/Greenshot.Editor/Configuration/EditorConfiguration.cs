@@ -50,6 +50,9 @@ namespace Greenshot.Editor.Configuration
         [IniProperty("HaProCompactToolbar", Description = "ha-pro: show the tool properties in the row of the destination buttons instead of an own row", DefaultValue = "True")]
         public bool HaProCompactToolbar { get; set; }
 
+        [IniProperty("HaProGrowCanvas", Description = "ha-pro: an element drawn, moved or resized past the edge of the image enlarges the canvas so it stays visible", DefaultValue = "True")]
+        public bool HaProGrowCanvas { get; set; }
+
         [IniProperty("WindowPlacementFlags", Description = "Placement flags", DefaultValue = "0")]
         public WindowPlacementFlags WindowPlacementFlags { get; set; }
 
