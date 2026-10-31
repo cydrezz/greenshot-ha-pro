@@ -2237,34 +2237,78 @@ namespace Greenshot.Editor.Drawing
         {
             if (_haProSelectContainer == null) return;
 
-            var selection = _haProSelectContainer.Bounds;
+            NativeRect selection = NativeRect.Empty;
+            Bitmap copy = null;
+            if (confirm)
+            {
+                copy = HaProCloneSelection(out selection);
+            }
+
             RemoveHaProSelectContainer();
             DrawingMode = DrawingModes.None;
 
-            if (confirm && _image != null)
+            if (copy != null)
             {
-                selection = selection.Intersect(new NativeRect(0, 0, _image.Width, _image.Height));
-                if (selection.Width > 0 && selection.Height > 0)
+                using (copy)
                 {
-                    Bitmap copy;
-                    using (Image flattened = GetImageForExport())
-                    {
-                        copy = ImageHelper.CloneArea(flattened, selection, PixelFormat.DontCare);
-                    }
-
-                    using (copy)
-                    {
-                        // the ImageContainer clones the image, the copy is only needed until then
-                        IImageContainer container = AddImageContainer(copy, selection.X, selection.Y);
-                        SelectElement(container);
-                    }
-
-                    LOG.DebugFormat("ha-pro: selection {0} copied as image element", selection);
+                    // the ImageContainer clones the image, the copy is only needed until then
+                    IImageContainer container = AddImageContainer(copy, selection.X, selection.Y);
+                    SelectElement(container);
                 }
+
+                LOG.DebugFormat("ha-pro: selection {0} copied as image element", selection);
             }
 
             // maybe the undo button has to be enabled
             _movingElementChanged?.Invoke(this, new SurfaceElementEventArgs());
+        }
+
+        /// <summary>
+        /// ha-pro: Ctrl+C (or Ctrl+X) while the select-area rectangle is pending puts the visible pixels
+        /// of the area on the clipboard (PNG/DIB/bitmap, like the clipboard destination) and drops the
+        /// rectangle, so Ctrl+V pastes them as a movable image element right away. Nothing is cut out
+        /// of the image, Ctrl+X behaves like Ctrl+C here.
+        /// </summary>
+        public void HaProCopySelectionToClipboard()
+        {
+            if (_haProSelectContainer == null) return;
+
+            Bitmap copy = HaProCloneSelection(out NativeRect selection);
+            RemoveHaProSelectContainer();
+            DrawingMode = DrawingModes.None;
+
+            if (copy != null)
+            {
+                // the clipboard helper wants a surface, a throw-away one carries the copy and disposes it
+                using (var carrier = new Surface(copy))
+                {
+                    ClipboardHelper.SetClipboardData(carrier);
+                }
+
+                LOG.DebugFormat("ha-pro: selection {0} copied to the clipboard", selection);
+            }
+
+            // the editor refreshes its controls on this event (paste button, confirm state)
+            _movingElementChanged?.Invoke(this, new SurfaceElementEventArgs());
+        }
+
+        /// <summary>
+        /// ha-pro: the visible pixels (image plus elements, as exported) inside the pending select-area
+        /// rectangle, clamped to the image. Null without a usable rectangle. The caller disposes the bitmap.
+        /// </summary>
+        private Bitmap HaProCloneSelection(out NativeRect selection)
+        {
+            selection = NativeRect.Empty;
+            if (_haProSelectContainer == null || _image == null) return null;
+
+            selection = _haProSelectContainer.Bounds.Intersect(new NativeRect(0, 0, _image.Width, _image.Height));
+            if (selection.Width <= 0 || selection.Height <= 0) return null;
+
+            // the rectangle itself does not draw in EXPORT mode, so it is not part of the copy
+            using (Image flattened = GetImageForExport())
+            {
+                return ImageHelper.CloneArea(flattened, selection, PixelFormat.DontCare);
+            }
         }
 
         /// <summary>
@@ -2750,6 +2794,12 @@ namespace Greenshot.Editor.Drawing
                     break;
                 case Keys.Divide | Keys.Control:
                     FlipShadow();
+                    break;
+                case Keys.C | Keys.Control:
+                case Keys.X | Keys.Control:
+                    // ha-pro: in select-area mode the pixels go to the clipboard, otherwise the editor menu handles it
+                    if (DrawingMode != DrawingModes.HaProSelect) return false;
+                    HaProCopySelectionToClipboard();
                     break;
                 /*case Keys.Delete:
                         RemoveSelectedElements();
