@@ -207,6 +207,12 @@ namespace Greenshot.Editor.Drawing
         [NonSerialized] private bool _haProHadSelectionOnMouseDown;
 
         /// <summary>
+        /// ha-pro: where every element was at mouse down, the mouse up grows the canvas only for what changed.
+        /// A list compared by reference, FreehandContainer overrides Equals/GetHashCode with its changing path.
+        /// </summary>
+        [NonSerialized] private List<KeyValuePair<IDrawableContainer, NativeRect>> _haProGeometryOnMouseDown;
+
+        /// <summary>
         /// all selected elements, do not serialize
         /// </summary>
         [NonSerialized] private readonly IDrawableContainerList selectedElements;
@@ -1457,6 +1463,9 @@ namespace Greenshot.Editor.Drawing
         {
             e = InverseZoomMouseCoordinates(e);
 
+            // ha-pro: remembered for the mouse up, the canvas grows only for what this gesture drew, moved or resized
+            HaProRememberGeometry();
+
             // Handle Adorners
             var adorner = FindActiveAdorner(e);
             if (adorner != null)
@@ -1677,10 +1686,14 @@ namespace Greenshot.Editor.Drawing
         /// Only the geometry (Bounds) decides, a line end poking out by its own thickness does not grow
         /// anything; once it grows, the stroke and shadow (DrawingBounds) fit as well. Undoable like
         /// any canvas change. Ini switch: HaProGrowCanvas=False (section Editor).
+        /// Only elements this mouse gesture added or changed count (compared with the mouse down), so a
+        /// plain click never grows anything: not after a crop and not after an undo of the growth.
         /// </summary>
         private void HaProGrowCanvasToElements()
         {
-            if (!HaProGrowCanvasEnabled || _image == null || _elements.Count == 0)
+            var geometryOnMouseDown = _haProGeometryOnMouseDown;
+            _haProGeometryOnMouseDown = null;
+            if (!HaProGrowCanvasEnabled || geometryOnMouseDown == null || _image == null || _elements.Count == 0)
             {
                 return;
             }
@@ -1694,8 +1707,8 @@ namespace Greenshot.Editor.Drawing
                     continue;
                 }
 
-                var bounds = element.Bounds;
-                if (bounds.Width <= 0 || bounds.Height <= 0 || imageRectangle.Contains(bounds))
+                var bounds = HaProGrowthGeometry(element);
+                if (HaProGeometryUnchanged(geometryOnMouseDown, element, bounds) || !GeometryHelper.HaProLeavesImage(imageRectangle, bounds))
                 {
                     continue;
                 }
@@ -1721,6 +1734,49 @@ namespace Greenshot.Editor.Drawing
             _surfaceSizeChanged?.Invoke(this, null);
             Invalidate();
             LOG.DebugFormat("ha-pro: canvas grown by {0},{1},{2},{3} (left, top, right, bottom) to {4}", left, top, right, bottom, newImage.Size);
+        }
+
+        /// <summary>
+        /// ha-pro: the rectangle that decides about canvas growth. A freehand reports the whole image as
+        /// Bounds (upstream, see its constructor), there the drawn path decides.
+        /// </summary>
+        private static NativeRect HaProGrowthGeometry(IDrawableContainer element)
+            => element is FreehandContainer freehand ? freehand.HaProPathBounds : element.Bounds;
+
+        /// <summary>
+        /// ha-pro: called at mouse down, see _haProGeometryOnMouseDown
+        /// </summary>
+        private void HaProRememberGeometry()
+        {
+            _haProGeometryOnMouseDown = null;
+            if (!HaProGrowCanvasEnabled)
+            {
+                return;
+            }
+
+            var geometry = new List<KeyValuePair<IDrawableContainer, NativeRect>>(_elements.Count);
+            foreach (var element in _elements)
+            {
+                geometry.Add(new KeyValuePair<IDrawableContainer, NativeRect>(element, HaProGrowthGeometry(element)));
+            }
+
+            _haProGeometryOnMouseDown = geometry;
+        }
+
+        /// <summary>
+        /// ha-pro: true if the element was there at mouse down with the same geometry (new elements are not)
+        /// </summary>
+        private static bool HaProGeometryUnchanged(List<KeyValuePair<IDrawableContainer, NativeRect>> geometryOnMouseDown, IDrawableContainer element, NativeRect geometry)
+        {
+            foreach (var remembered in geometryOnMouseDown)
+            {
+                if (ReferenceEquals(remembered.Key, element))
+                {
+                    return remembered.Value.Equals(geometry);
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -2269,27 +2325,31 @@ namespace Greenshot.Editor.Drawing
         /// rectangle, so Ctrl+V pastes them as a movable image element right away. Nothing is cut out
         /// of the image, Ctrl+X behaves like Ctrl+C here.
         /// </summary>
-        public void HaProCopySelectionToClipboard()
+        /// <returns>false if there was nothing to copy, then nothing changed and the key is not handled</returns>
+        public bool HaProCopySelectionToClipboard()
         {
-            if (_haProSelectContainer == null) return;
+            if (_haProSelectContainer == null) return false;
 
             Bitmap copy = HaProCloneSelection(out NativeRect selection);
+            // ha-pro: nothing to copy (a rectangle dragged exactly straight has a width or height of 0, or it
+            // lies beside the image): keep the tool, before this the key was swallowed, the tool dropped and
+            // nothing was on the clipboard
+            if (copy == null) return false;
+
             RemoveHaProSelectContainer();
             DrawingMode = DrawingModes.None;
 
-            if (copy != null)
+            // the clipboard helper wants a surface, a throw-away one carries the copy and disposes it
+            using (var carrier = new Surface(copy))
             {
-                // the clipboard helper wants a surface, a throw-away one carries the copy and disposes it
-                using (var carrier = new Surface(copy))
-                {
-                    ClipboardHelper.SetClipboardData(carrier);
-                }
-
-                LOG.DebugFormat("ha-pro: selection {0} copied to the clipboard", selection);
+                ClipboardHelper.SetClipboardData(carrier);
             }
+
+            LOG.DebugFormat("ha-pro: selection {0} copied to the clipboard", selection);
 
             // the editor refreshes its controls on this event (paste button, confirm state)
             _movingElementChanged?.Invoke(this, new SurfaceElementEventArgs());
+            return true;
         }
 
         /// <summary>
@@ -2798,8 +2858,8 @@ namespace Greenshot.Editor.Drawing
                 case Keys.C | Keys.Control:
                 case Keys.X | Keys.Control:
                     // ha-pro: in select-area mode the pixels go to the clipboard, otherwise the editor menu handles it
-                    if (DrawingMode != DrawingModes.HaProSelect) return false;
-                    HaProCopySelectionToClipboard();
+                    // ha-pro: the same when the rectangle holds nothing to copy, the key must not be swallowed then
+                    if (DrawingMode != DrawingModes.HaProSelect || !HaProCopySelectionToClipboard()) return false;
                     break;
                 /*case Keys.Delete:
                         RemoveSelectedElements();

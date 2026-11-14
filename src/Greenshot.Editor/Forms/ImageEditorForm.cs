@@ -1733,6 +1733,16 @@ namespace Greenshot.Editor.Forms
                 {
                     ToolStripItemEndisabler.Disable(menuStrip1);
                     ToolStripItemEndisabler.Disable(destinationsToolStrip);
+                    if (_haProPropertyItems != null)
+                    {
+                        // ha-pro: the compact toolbar moved the tool properties into the destination row, which
+                        // was just disabled. Upstream never locks them, confirm / cancel / crop mode are needed now.
+                        foreach (ToolStripItem propertyItem in _haProPropertyItems)
+                        {
+                            ToolStripItemEndisabler.Enable(propertyItem);
+                        }
+                    }
+
                     ToolStripItemEndisabler.Disable(toolsToolStrip);
                     ToolStripItemEndisabler.Enable(closeToolStripMenuItem);
                     ToolStripItemEndisabler.Enable(helpToolStripMenuItem);

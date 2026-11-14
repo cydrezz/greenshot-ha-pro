@@ -445,7 +445,7 @@ namespace Greenshot.Forms
                 // Go and process the capture
                 DialogResult = DialogResult.OK;
             }
-            else if (_captureMode == CaptureMode.Region)
+            else if (_captureMode == CaptureMode.Region && HaProIsPlainClick())
             {
                 // ha-pro: a plain click without dragging captures the monitor under the cursor.
                 // Screen bounds are in screen coordinates, _captureRect is relative to _capture.ScreenBounds.
@@ -458,6 +458,16 @@ namespace Greenshot.Forms
             {
                 Invalidate();
             }
+        }
+
+        /// <summary>
+        /// ha-pro: the mouse went up where it went down, give or take the system drag size. A drag in an exactly
+        /// straight line has a width or height of 0 as well, but is no click: it captures nothing (as upstream).
+        /// </summary>
+        private bool HaProIsPlainClick()
+        {
+            var dragSize = SystemInformation.DragSize;
+            return Math.Abs(_mouseMovePos.X - _mX) < dragSize.Width && Math.Abs(_mouseMovePos.Y - _mY) < dragSize.Height;
         }
 
         /// <summary>

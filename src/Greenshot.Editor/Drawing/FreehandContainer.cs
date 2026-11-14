@@ -62,6 +62,12 @@ namespace Greenshot.Editor.Drawing
             Left = 0;
         }
 
+        /// <summary>
+        /// ha-pro: where the drawn path is, in surface coordinates. Bounds is the whole image (see the constructor,
+        /// shifted by moves) and says nothing about the path, the canvas growth in Surface asks this instead.
+        /// </summary>
+        internal NativeRect HaProPathBounds => new NativeRect(myBounds.Left + Left, myBounds.Top + Top, myBounds.Width, myBounds.Height);
+
         protected override void InitializeFields()
         {
             AddField(GetType(), FieldType.LINE_THICKNESS, 4); // ha-pro: default 4 instead of 3

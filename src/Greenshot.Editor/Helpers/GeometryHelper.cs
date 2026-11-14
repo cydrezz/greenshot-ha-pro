@@ -20,6 +20,8 @@
  */
 
 using System;
+using Dapplo.Windows.Common.Extensions;
+using Dapplo.Windows.Common.Structs;
 
 namespace Greenshot.Editor.Helpers
 {
@@ -59,6 +61,25 @@ namespace Greenshot.Editor.Helpers
         public static double Angle2D(int x1, int y1, int x2, int y2)
         {
             return Math.Atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        }
+
+        /// <summary>
+        /// ha-pro: does the geometry of an element reach out of the image (canvas growth in Surface)?
+        /// An exactly horizontal or vertical line has a height or width of 0 and still counts,
+        /// only a point (both 0) does not.
+        /// </summary>
+        /// <param name="image">NativeRect of the image</param>
+        /// <param name="geometry">NativeRect of the element, a negative width or height is normalized here</param>
+        /// <returns>true if a part of the geometry lies outside the image</returns>
+        public static bool HaProLeavesImage(NativeRect image, NativeRect geometry)
+        {
+            geometry = geometry.Normalize();
+            if (geometry.Width <= 0 && geometry.Height <= 0)
+            {
+                return false;
+            }
+
+            return geometry.Left < image.Left || geometry.Top < image.Top || geometry.Right > image.Right || geometry.Bottom > image.Bottom;
         }
     }
 }
